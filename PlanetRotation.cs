@@ -12,27 +12,36 @@ public class PlanetRotation : MonoBehaviour {
     private int clickSpinAmount = 100;
     private Rigidbody rb;
 
-    void Start() {
+    private RaycastHit hit;
+    private Ray ray;
+
+    void Awake() {
 
         rb = GetComponent<Rigidbody>();
-
     }
 
     void HandleInput() {
 
+
         if (Input.GetMouseButtonDown(0)) {
 
-            OnClickRotatePlanet(clickSpinAmount);
 
+            ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
+            if (Physics.Raycast(ray, out hit)) {
+
+                if (hit.transform.tag == "Planet") {
+
+                    OnClickRotatePlanet(clickSpinAmount);
+                }
+            }
         }
-
     }
 
     void OnClickRotatePlanet(float amount) {
 
         rb.AddRelativeTorque(Vector3.up * clickSpinAmount, ForceMode.Impulse);
-        GameManager.Instance.Points += 1;
+        GameManager.Instance.AddPointsEachClick();
     }
 
     void RotatePlanetIdle() {
@@ -40,7 +49,6 @@ public class PlanetRotation : MonoBehaviour {
         rb.AddRelativeTorque(Vector3.up * IdleSpinSpeed);
 
     }
-
     void Update() {
 
         HandleInput();
@@ -50,7 +58,6 @@ public class PlanetRotation : MonoBehaviour {
     void FixedUpdate() {
 
         RotatePlanetIdle();
-
 
     }
 
