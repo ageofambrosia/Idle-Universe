@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
+using UnityEngine.EventSystems;
 
 //Controls the overall rotation of the each planet.
 //If a planet rotates in any way -> handle from this script.
@@ -9,7 +9,7 @@ using UnityEngine;
 public class PlanetRotation : MonoBehaviour {
 
     public float IdleSpinSpeed = 10;
-    private int clickSpinAmount = 100;
+    private int clickSpinAmount = 30;
     private Rigidbody rb;
 
     private RaycastHit hit;
@@ -18,10 +18,10 @@ public class PlanetRotation : MonoBehaviour {
     void Awake() {
 
         rb = GetComponent<Rigidbody>();
+
     }
 
     void HandleInput() {
-
 
         if (Input.GetMouseButtonDown(0)) {
 
@@ -39,6 +39,12 @@ public class PlanetRotation : MonoBehaviour {
     }
 
     void OnClickRotatePlanet(float amount) {
+
+        //If clicks are on UI, dont raycast under.
+        if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject(0)) {
+            return;
+        }
+
 
         rb.AddRelativeTorque(Vector3.up * clickSpinAmount, ForceMode.Impulse);
         GameManager.Instance.AddPointsEachClick();

@@ -10,6 +10,7 @@ public class UpgradeButton : MonoBehaviour {
     public int upgradePower;
     public bool idle;
     public int boughtCount;
+    public int maxBuyTimes;
 
     private float _newCost;
     private Text txt;
@@ -25,18 +26,41 @@ public class UpgradeButton : MonoBehaviour {
 
     }
 
-    //Save playerprefs.
-
     void Update() {
 
-        txt.text = "Cost:" + cost + " " + boughtCount;
+        txt.text = CurrencyToString("Cost: ", cost) + "\n" + boughtCount;
 
-        if (GameManager.Instance.Points < cost) {
+        HandleButton();
+
+    }
+
+    void HandleButton() {
+
+        if (boughtCount >= maxBuyTimes) {
+            GetComponentInChildren<Text>().text = "MAX!" + "\n" + boughtCount;
+            GetComponent<Button>().interactable = false;
+        } else if (GameManager.Instance.Points < cost) {
             GetComponent<Button>().interactable = false;
         } else
             GetComponent<Button>().interactable = true;
 
+    }
 
+    public string CurrencyToString(string text, float valueToConvert) {
+
+        string converted = null;
+
+        if (valueToConvert >= 1000) {
+            converted = text + (valueToConvert / 1000f).ToString("f3") + " K";
+        } else if (valueToConvert >= 1000000) {
+            converted = text + (valueToConvert / 1000000f).ToString("f3") + " M";
+        } else if (valueToConvert >= 1000000000000) {
+            converted = text + (valueToConvert / 1000000000000).ToString("f3") + " B";
+        } else {
+            converted = text + valueToConvert.ToString();
+        }
+
+        return converted;
     }
 
     public void PurchaseUpgrade() {
@@ -48,7 +72,7 @@ public class UpgradeButton : MonoBehaviour {
                 GameManager.Instance.Points -= cost;
                 GameManager.Instance.PointsPerSecond += upgradePower;
                 boughtCount++;
-                cost = Mathf.Round(cost * 1.35f);
+                cost = Mathf.Round(cost * 1.45f);
                 _newCost = Mathf.Pow(cost, _newCost = cost);
             }
 
@@ -58,7 +82,7 @@ public class UpgradeButton : MonoBehaviour {
                 GameManager.Instance.Points -= cost;
                 GameManager.Instance.PointsPerClick += upgradePower;
                 boughtCount++;
-                cost = Mathf.Round(cost * 1.35f);
+                cost = Mathf.Round(cost * 1.45f);
                 _newCost = Mathf.Pow(cost, _newCost = cost);
 
             }
