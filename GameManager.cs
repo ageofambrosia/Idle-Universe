@@ -10,11 +10,25 @@ public class GameManager : MonoBehaviour {
 
     private GameObject currentPlanet;
     public GameObject greetingPanel;
+    public GameObject PointsOnClickPrefab;
+
+    public Transform myCanvas;
+    public Transform zoomedOutCanvas;
+
+    private Camera mainCam;
+    public float normalDepth, zoomedOutDepth;
+    private float lastPlanetX, lastPlanetZ;
 
     public Text pointsWhileOfflineText;
     public Text pointsText;
     public Text pointsPerClickText;
     public Text pointsPerSecondText;
+
+    private float time;
+    public float timeTakenDuringLerp = 0.1f;
+    private bool _isLerping;
+    private float _timeStartedLerping;
+    private Vector3 _startPosition, _endPosition;
 
     public float Points;
     public float PointsPerClick = 1;
@@ -27,6 +41,9 @@ public class GameManager : MonoBehaviour {
         Points = PlayerPrefs.GetFloat("Points", 0);
         PointsPerClick = PlayerPrefs.GetFloat("PerClick", 1);
         PointsPerSecond = PlayerPrefs.GetFloat("PerSecond", 0);
+
+        lastPlanetX = PlayerPrefs.GetFloat("lastX", 0);
+        lastPlanetZ = PlayerPrefs.GetFloat("lastZ", -10);
     }
 
     void GetIdleTime() {
@@ -65,28 +82,31 @@ public class GameManager : MonoBehaviour {
         }
 
         GetValuesFromPrefs();
+
+        mainCam = Camera.main;
     }
 
     void Start() {
+
+        mainCam.transform.position = new Vector3(lastPlanetX, mainCam.transform.position.y, lastPlanetZ);
 
         // how much time has passed since logging off
         GetIdleTime();
 
         StartCoroutine(AddPointsPerSecond());
 
+        zoomedOutCanvas.gameObject.SetActive(false);
+
         //Get points from offline
         float pointsFromIdle = (float)difference.TotalSeconds * PointsPerSecond;
         Points += pointsFromIdle;
 
-        //checks if first game(if you have 1 point when you enter the game, only on start hopefully).
-        if (Points <= 1) {
-            return;
+        if (pointsFromIdle > 0) {
+            //show greetingPanel and set text to the points collected while offline
+            greetingPanel.SetActive(true);
+            pointsWhileOfflineText.text = CurrencyToString("", pointsFromIdle);
         }
-        //show greetingPanel and set text to the points collected while offline
-        greetingPanel.SetActive(true);
-        pointsWhileOfflineText.text = CurrencyToString("", pointsFromIdle);
     }
-
 
     void Update() {
 
@@ -94,28 +114,54 @@ public class GameManager : MonoBehaviour {
         pointsPerClickText.text = CurrencyToString("Per Click: ", PointsPerClick);
         pointsPerSecondText.text = CurrencyToString("Per Second: ", PointsPerSecond);
 
+
+        //Lerp
+        if (_isLerping) {
+
+            float timeSinceStarted = Time.time - _timeStartedLerping;
+            float percentageComplete = timeSinceStarted / timeTakenDuringLerp;
+
+            mainCam.transform.position = Vector3.Lerp(_startPosition, _endPosition, percentageComplete);
+
+            if (percentageComplete >= 1.0f) {
+                _isLerping = false;
+            }
+        }
+
     }
 
     public string CurrencyToString(string text, float valueToConvert) {
 
         string converted = null;
 
-        if (valueToConvert >= 1000) {
-            converted = text + (valueToConvert / 1000f).ToString("f3") + " K";
-        } else if (valueToConvert >= 1000000) {
-            converted = text + (valueToConvert / 1000000f).ToString("f3") + " M";
-        } else if (valueToConvert >= 1000000000000) {
-            converted = text + (valueToConvert / 1000000000000).ToString("f3") + " B";
-        } else {
+        if (valueToConvert < 1000) {
             converted = text + valueToConvert.ToString("f0");
+        } else if (valueToConvert >= 1000 && valueToConvert <= 1000000) {
+            converted = text + (valueToConvert / 1000f).ToString("f2") + " K";
+        } else if (valueToConvert >= 1000000 && valueToConvert <= 1000000000) {
+            converted = text + (valueToConvert / 1000000f).ToString("f2") + " M";
+        } else if (valueToConvert >= 1000000000) {
+            converted = text + (valueToConvert / 1000000000).ToString("f2") + " B";
+        } else {
+            //value over 1B
+            converted = text + valueToConvert.ToString("over 1 B(Handle)");
         }
-
         return converted;
     }
 
     public void AddPointsEachClick() {
 
+
+        if (!myCanvas.gameObject.activeInHierarchy)
+            return;
+
         Points += PointsPerClick;
+
+        //Points Effect instantiation
+        Vector3 pos = Input.mousePosition;
+        pos.z = 0;
+
+        GameObject prefab = (GameObject)Instantiate(PointsOnClickPrefab, pos, Quaternion.identity, myCanvas);
 
     }
 
@@ -136,6 +182,10 @@ public class GameManager : MonoBehaviour {
             PlayerPrefs.SetFloat("Points", Points);
             PlayerPrefs.SetFloat("PerClick", PointsPerClick);
             PlayerPrefs.SetFloat("PerSecond", PointsPerSecond);
+
+            PlayerPrefs.SetFloat("lastX", mainCam.transform.position.x);
+            PlayerPrefs.SetFloat("lastZ", mainCam.transform.position.z);
+
         }
     }
 
@@ -145,12 +195,46 @@ public class GameManager : MonoBehaviour {
         PlayerPrefs.SetFloat("Points", Points);
         PlayerPrefs.SetFloat("PerClick", PointsPerClick);
         PlayerPrefs.SetFloat("PerSecond", PointsPerSecond);
+
+        PlayerPrefs.SetFloat("lastX", mainCam.transform.position.x);
+        PlayerPrefs.SetFloat("lastZ", mainCam.transform.position.z);
     }
 
 
+    //Handle Button presses.
     public void OnCloseGreetingPanelClick() {
 
         greetingPanel.SetActive(false);
+    }
+
+    public void OnPlanetSelectClick() {
+
+        //disable canvas(easy way, change later) and zoom camera out.
+        myCanvas.gameObject.SetActive(false);
+
+        //Lerp to Solar system
+        CameraLerp(mainCam.transform.position, new Vector3(0, mainCam.transform.position.y, zoomedOutDepth));
+
+        StartCoroutine("ActivateZoomedOutCanvas");
+    }
+
+    public void CameraLerp(Vector3 startPos, Vector3 endPos) {
+
+        _isLerping = true;
+        _timeStartedLerping = Time.time;
+
+        _startPosition = startPos;
+        _endPosition = endPos;
 
     }
+
+    IEnumerator ActivateZoomedOutCanvas() {
+
+        //activate second canvas
+        yield return new WaitForSeconds(0.7f);
+
+        zoomedOutCanvas.gameObject.SetActive(true);
+
+    }
+
 }

@@ -50,16 +50,18 @@ public class UpgradeButton : MonoBehaviour {
 
         string converted = null;
 
-        if (valueToConvert >= 1000) {
-            converted = text + (valueToConvert / 1000f).ToString("f3") + " K";
-        } else if (valueToConvert >= 1000000) {
-            converted = text + (valueToConvert / 1000000f).ToString("f3") + " M";
-        } else if (valueToConvert >= 1000000000000) {
-            converted = text + (valueToConvert / 1000000000000).ToString("f3") + " B";
+        if (valueToConvert < 1000) {
+            converted = text + valueToConvert.ToString("f0");
+        } else if (valueToConvert >= 1000 && valueToConvert <= 1000000) {
+            converted = text + (valueToConvert / 1000f).ToString("f2") + " K";
+        } else if (valueToConvert >= 1000000 && valueToConvert <= 1000000000) {
+            converted = text + (valueToConvert / 1000000f).ToString("f2") + " M";
+        } else if (valueToConvert >= 1000000000) {
+            converted = text + (valueToConvert / 1000000000).ToString("f2") + " B";
         } else {
-            converted = text + valueToConvert.ToString();
+            //value over 1B
+            converted = text + valueToConvert.ToString("over 1 B(Handle)");
         }
-
         return converted;
     }
 
