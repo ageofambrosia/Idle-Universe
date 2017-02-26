@@ -10,7 +10,7 @@ public class Planet : MonoBehaviour {
 
 	private Rigidbody rb;
 
-	void Awake () {
+	void Awake() {
 		rb = GetComponent<Rigidbody>();
 
 	}
@@ -34,11 +34,14 @@ public class Planet : MonoBehaviour {
 
 	void FixedUpdate() {
 
+		if (GameManager.Instance.PointsPerSecond <= 0) {
+			return;
+		}
 		RotatePlanetIdle();
 
 	}
 
-	void Update () {
-		
+	void Update() {
+
 	}
 }

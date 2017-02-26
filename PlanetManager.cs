@@ -44,6 +44,8 @@ public class PlanetManager : MonoBehaviour {
 
                         StartCoroutine("ActivateUI");
 
+                        GameManager.Instance.ChangeSideBar(hit.transform.name);
+
                     } else
                         hit.transform.gameObject.GetComponent<Planet>().OnClickRotatePlanet();
                 }
