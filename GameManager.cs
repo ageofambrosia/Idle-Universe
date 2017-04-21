@@ -1,393 +1,405 @@
+using System;
 using System.Collections;
-using System.Collections.Generic;
+using System.IO;
+using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
 using UnityEngine.UI;
-using System;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.IO;
 
 public class GameManager : MonoBehaviour {
 
-	public static GameManager Instance;
-	//private GameObject currentPlanet;
+    public static GameManager Instance;
 
-	[Header("Panel for showing points since gone and prefab for click on planet")]
-	public GameObject greetingPanel;
-	public GameObject PointsOnClickPrefab;
+    [Header("Panel for showing points since gone and prefab for click on planet")]
+    public GameObject greetingPanel;
+    public GameObject PointsOnClickPrefab;
 
-	[Header("Settings Button and Panel Reference")]
-	public GameObject settingsButton;
-	public GameObject settingsPanel;
+    [Header("Settings Button and Panel Reference")]
+    public GameObject settingsButton;
+    public GameObject settingsPanel;
 
 
-	[Header("\"My Canvas\" for planet view \"ZoomedOut\" for solar system")]
-	public Transform myCanvas;
-	public GameObject zoomedOutCanvasWorld;
-	public GameObject zoomedOutCanvasOverlay;
+    [Header("\"My Canvas\" for planet view \"ZoomedOut\" for solar system")]
+    public Transform myCanvas;
+    public GameObject zoomedOutCanvasOverlay;
 
-	[Header("Side bar stuff")]
-	public GameObject[] SidePanelsArray;
-	public ScrollRect sideBar;
+    [Header("Side bar stuff")]
+    public GameObject[] SidePanelsArray;
+    public ScrollRect sideBar;
 
-	private Camera mainCam;
-	[Header("The camera depth to lerp")]
-	public float normalDepth;
-	public float zoomedOutDepth;
+    private Camera mainCam;
+    [Header("The camera depth to lerp")]
+    public float normalDepth;
+    public float zoomedOutDepth;
 
-	private float lastPlanetX;
-	private float lastPlanetZ = -13;
-	private int sideBarIndex;
+    private float lastPlanetX;
+    private float lastPlanetZ = -13;
+    private int sideBarIndex;
 
-	[Header("All of the texts")]
-	public Text pointsWhileOfflineText;
-	public Text pointsText;
-	public Text pointsPerClickText;
-	public Text pointsPerSecondText;
+    [Header("All of the texts")]
+    public Text pointsWhileOfflineText;
+    public Text pointsText;
+    public Text pointsTextForSecondCanvas;
+    public Text pointsPerClickText;
+    public Text pointsPerSecondText;
+    public Text planetNameText;
+    public Text currentUnlockCostText;
 
 
-	[Header("How fast to lerp")]
-	public float timeTakenDuringLerp = 0.1f;
+    [Header("How fast to lerp")]
+    public float timeTakenDuringLerp = 0.1f;
 
-	//For lerping
-	private float time;
-	private bool _isLerping;
-	private float _timeStartedLerping;
-	private Vector3 _startPosition, _endPosition;
+    //For lerping
+    private float time;
+    private bool _isLerping;
+    private float _timeStartedLerping;
+    private Vector3 _startPosition, _endPosition;
 
-	[Header("Points")]
-	public float Points;
-	public float PointsPerClick = 1;
-	public float PointsPerSecond;
+    [Header("Points")]
+    public float Points;
+    public float PointsPerClick = 1;
+    public float PointsPerSecond;
 
-	//For getting time since offline
-	private DateTime exitTime, EnterTime;
-	public TimeSpan difference;
-	private string sysString;
+    //For getting time since offline
+    private DateTime exitTime, EnterTime;
+    public TimeSpan difference;
+    private string sysString;
 
+    private string[] planetNames = { "Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune" };
+    [HideInInspector]
+    public int planetInSolarViewIndex;
 
+    public GameObject[] planetsGO;
+    public bool[] unlockedState;
+    public GameObject UnlockPlanetButton;
+    public float[] unlockCost;
 
+    void Awake() {
 
-	void Awake() {
+        if (Instance != null) {
 
-		if (Instance != null) {
+            Debug.LogError("More than one GameManager in scene");
+            Destroy(this.gameObject);
+        }
 
-			Debug.LogError("More than one GameManager in scene");
-			Destroy(this.gameObject);
+        Instance = this;
 
-		}
-		Instance = this;
+        mainCam = Camera.main;
 
-		mainCam = Camera.main;
+        Load();
 
-		Load();
-	}
+        if (unlockedState.Length == 0) {
+            unlockedState = new bool[8];
+        }
+        unlockedState[0] = true;
+    }
 
-	void Start() {
+    void Start() {
+        //set the camera to the last planet position.
+        mainCam.transform.position = new Vector3(lastPlanetX, mainCam.transform.position.y, lastPlanetZ);
 
-		//set the camera to the last planet position.
-		mainCam.transform.position = new Vector3(lastPlanetX, mainCam.transform.position.y, lastPlanetZ);
+        if (lastPlanetZ == zoomedOutDepth) {
+            OnSolarSystemClick();
+        }
 
-		if (lastPlanetZ == -80) {
-			OnSolarSystemClick();
-		}
+        foreach (GameObject go in SidePanelsArray) {
+            go.SetActive(false);
+        }
 
-		foreach (GameObject go in SidePanelsArray) {
-			go.SetActive(false);
-		}
+        for (int i = 0; i < planetsGO.Length; i++) {
 
-		for (int i = 0; i < SidePanelsArray.Length; i++) {
+            if (unlockedState[i]) {
+                planetsGO[i].transform.tag = "Planet";
 
-			if (i == sideBarIndex) {
+            } else {
+                planetsGO[i].transform.tag = "Locked";
+            }
+        }
 
-				SidePanelsArray[i].SetActive(true);
-				sideBar.content = SidePanelsArray[i].GetComponent<RectTransform>();
-			}
-		}
 
-		//Get how much time has passed since logging off
-		GetIdleTime();
+        for (int i = 0; i < SidePanelsArray.Length; i++) {
 
-		StartCoroutine(AddPointsPerSecond());
+            if (i == sideBarIndex) {
 
-		//Get points from offline
-		float pointsFromIdle = (float)difference.TotalSeconds * PointsPerSecond;
-		Points += pointsFromIdle;
+                SidePanelsArray[i].SetActive(true);
+                sideBar.content = SidePanelsArray[i].GetComponent<RectTransform>();
+            }
+        }
 
-		if (pointsFromIdle > 0) {
-			//show greetingPanel and set text to the points collected while offline
-			greetingPanel.SetActive(true);
-			pointsWhileOfflineText.text = CurrencyToString("", pointsFromIdle);
-		}
+        //Get how much time has passed since logging off
+        GetIdleTime();
 
-		//Intial state
-		settingsPanel.SetActive(false);
-		settingsButton.SetActive(true);
+        StartCoroutine(AddPointsPerSecond());
 
-	}
+        //Get points from offline
+        float pointsFromIdle = (float)difference.TotalSeconds * PointsPerSecond / 3;
+        Points += pointsFromIdle;
 
-	void GetIdleTime() {
+        if (pointsFromIdle > 0) {
+            //show greetingPanel and set text to the points collected while offline
+            greetingPanel.SetActive(true);
+            pointsWhileOfflineText.text = CurrencyToString("", pointsFromIdle);
+        }
 
-		EnterTime = DateTime.Now;
+        //Intial state
+        settingsPanel.SetActive(false);
+        settingsButton.SetActive(true);
 
-		//Grab the old time from the player prefs as a long
-		long temp = Convert.ToInt64(sysString);
+    }
 
-		//Convert the old time from binary to a DataTime variable
-		DateTime oldDate = DateTime.FromBinary(temp);
+    void GetIdleTime() {
 
-		if (oldDate == null) {
-			oldDate = DateTime.MinValue;
-		}
-		//Use the Subtract method and store the result as a timespan variable
-		difference = EnterTime.Subtract(oldDate);
+        EnterTime = DateTime.Now;
 
-	}
+        //Grab the old time from the player prefs as a long
+        long temp = Convert.ToInt64(sysString);
 
+        //Convert the old time from binary to a DataTime variable
+        DateTime oldDate = DateTime.FromBinary(temp);
 
-	void Update() {
+        if (oldDate == null) {
+            oldDate = DateTime.MinValue;
+        }
+        //Use the Subtract method and store the result as a timespan variable
+        difference = EnterTime.Subtract(oldDate);
+    }
 
-		pointsText.text = CurrencyToString("Points: ", Points);
-		pointsPerClickText.text = CurrencyToString("Per Click: ", PointsPerClick);
-		pointsPerSecondText.text = CurrencyToString("Per Second: ", PointsPerSecond);
+    void Update() {
 
-		lastPlanetX = mainCam.transform.position.x;
-		lastPlanetZ = mainCam.transform.position.z;
+        pointsText.text = CurrencyToString("Points: ", Points);
+        pointsTextForSecondCanvas.text = CurrencyToString("Points: ", Points);
 
-		if (mainCam.transform.position.z == -80) {
-			zoomedOutCanvasWorld.gameObject.SetActive(true);
-			zoomedOutCanvasOverlay.gameObject.SetActive(true);
+        pointsPerClickText.text = CurrencyToString("Per Click: ", PointsPerClick);
+        pointsPerSecondText.text = CurrencyToString("Per Second: ", PointsPerSecond);
 
-		}
-		else {
-			zoomedOutCanvasWorld.gameObject.SetActive(false);
-			zoomedOutCanvasOverlay.gameObject.SetActive(false);
-		}
-		//Lerp
-		if (_isLerping) {
+        planetNameText.text = planetNames[planetInSolarViewIndex].ToString();
+        currentUnlockCostText.text = CurrencyToString("Cost: ", unlockCost[planetInSolarViewIndex]);
 
-			float timeSinceStarted = Time.time - _timeStartedLerping;
-			float percentageComplete = timeSinceStarted / timeTakenDuringLerp;
+        lastPlanetX = mainCam.transform.position.x;
+        lastPlanetZ = mainCam.transform.position.z;
 
-			mainCam.transform.position = Vector3.Lerp(_startPosition, _endPosition, percentageComplete);
+        if (mainCam.transform.position.z == zoomedOutDepth) {
+            zoomedOutCanvasOverlay.gameObject.SetActive(true);
 
-			if (percentageComplete >= 1.0f) {
-				_isLerping = false;
-			}
-		}
+        } else {
+            zoomedOutCanvasOverlay.gameObject.SetActive(false);
+        }
+        //Lerp
+        if (_isLerping) {
 
-	}
+            float timeSinceStarted = Time.time - _timeStartedLerping;
+            float percentageComplete = timeSinceStarted / timeTakenDuringLerp;
 
-	//Lerp Camera
-	public void CameraLerp(Vector3 startPos, Vector3 endPos) {
+            mainCam.transform.position = Vector3.Lerp(_startPosition, _endPosition, percentageComplete);
 
-		_isLerping = true;
-		_timeStartedLerping = Time.time;
+            if (percentageComplete >= 1.0f) {
+                _isLerping = false;
+            }
+        }
 
-		_startPosition = startPos;
-		_endPosition = endPos;
+    }
 
-	}
 
+    //Lerp Camera
+    public void CameraLerp(Vector3 startPos, Vector3 endPos) {
 
-	//add K,M,B endings to the raw numbers
-	public string CurrencyToString(string text, float valueToConvert) {
+        _isLerping = true;
+        _timeStartedLerping = Time.time;
 
-		string converted = null;
+        _startPosition = startPos;
+        _endPosition = endPos;
 
-		if (valueToConvert < 1000) {
-			converted = text + valueToConvert.ToString("f0");
-		}
-		else if (valueToConvert >= 1000 && valueToConvert <= 1000000) {
-			converted = text + (valueToConvert / 1000f).ToString("f2") + " K";
-		}
-		else if (valueToConvert >= 1000000 && valueToConvert <= 1000000000) {
-			converted = text + (valueToConvert / 1000000f).ToString("f2") + " M";
-		}
-		else if (valueToConvert >= 1000000000) {
-			converted = text + (valueToConvert / 1000000000).ToString("f2") + " B";
-		}
-		else {
-			//value over 1B
-			converted = text + valueToConvert.ToString("over 1 B(Handle)");
-		}
-		return converted;
-	}
+    }
 
+    //add K,M,B endings to the raw numbers
+    public string CurrencyToString(string text, float valueToConvert) {
 
+        string converted = null;
 
-	//Add points per click and per second
-	public void AddPointsEachClick() {
+        if (valueToConvert < 1000) {
+            converted = text + valueToConvert.ToString("f0");
+        } else if (valueToConvert >= 1000 && valueToConvert <= 1000000) {
+            converted = text + (valueToConvert / 1000f).ToString("f2") + " K";
+        } else if (valueToConvert >= 1000000 && valueToConvert <= 1000000000) {
+            converted = text + (valueToConvert / 1000000f).ToString("f2") + " M";
+        } else if (valueToConvert >= 1000000000) {
+            converted = text + (valueToConvert / 1000000000).ToString("f2") + " B";
+        } else {
+            //value over 1B
+            converted = text + valueToConvert.ToString("over 1 B(Handle)");
+        }
+        return converted;
+    }
 
+    //Add points per click and per second
+    public void AddPointsEachClick() {
 
-		if (!myCanvas.gameObject.activeInHierarchy)
-			return;
 
-		Points += PointsPerClick;
+        if (!myCanvas.gameObject.activeInHierarchy)
+            return;
 
-		//Points Effect instantiation
-		Vector3 pos = Input.mousePosition;
-		pos.z = 0;
+        Points += PointsPerClick;
 
-		GameObject prefab = (GameObject)Instantiate(PointsOnClickPrefab, pos, Quaternion.identity, myCanvas);
+        //Points Effect instantiation
+        Vector3 pos = Input.mousePosition;
+        pos.z = 0;
 
-	}
-	IEnumerator AddPointsPerSecond() {
+        GameObject prefab = Instantiate(PointsOnClickPrefab, pos, Quaternion.identity, myCanvas);
+    }
 
-		while (true) {
-			Points += PointsPerSecond;
+    IEnumerator AddPointsPerSecond() {
 
-			yield return new WaitForSeconds(1);
-		}
-	}
+        while (true) {
+            Points += PointsPerSecond;
 
+            yield return new WaitForSeconds(1);
+        }
+    }
 
+    #region Buttons
 
-	//Handle Button presses.
-	public void OnCloseGreetingPanelClick() {
+    //Handle Button presses.
+    public void OnCloseGreetingPanelClick() {
 
-		greetingPanel.SetActive(false);
-	}
+        greetingPanel.SetActive(false);
+    }
 
-	public void OnSolarSystemClick() {
+    public void OnSolarSystemClick() {
 
-		//disable canvas(easy way, change later) and zoom camera out.
-		myCanvas.gameObject.SetActive(false);
+        //disable canvas(easy way, change later) and zoom camera out.
+        myCanvas.gameObject.SetActive(false);
 
-		//Lerp to Solar system
-		CameraLerp(mainCam.transform.position, new Vector3(0, mainCam.transform.position.y, zoomedOutDepth));
-	}
+        //Lerp to Solar system
+        CameraLerp(mainCam.transform.position, new Vector3(mainCam.transform.position.x, mainCam.transform.position.y, zoomedOutDepth));
+    }
 
-	public void ChangeSideBar(string nameOfPlanet) {
+    public void ChangeSideBar(string nameOfPlanet) {
 
-		foreach (GameObject go in SidePanelsArray) {
-			go.SetActive(false);
-		}
+        foreach (GameObject go in SidePanelsArray) {
+            go.SetActive(false);
+        }
 
+        for (int i = 0; i < SidePanelsArray.Length; i++) {
 
-		for (int i = 0; i < SidePanelsArray.Length; i++) {
+            if (SidePanelsArray[i].name == nameOfPlanet) {
+                SidePanelsArray[i].SetActive(true);
+                sideBar.content = SidePanelsArray[i].GetComponent<RectTransform>();
+                sideBarIndex = i;
+                return;
+            }
+        }
 
-			if (SidePanelsArray[i].name == nameOfPlanet) {
+    }
 
-				SidePanelsArray[i].SetActive(true);
-				sideBar.content = SidePanelsArray[i].GetComponent<RectTransform>();
-				sideBarIndex = i;
-				return;
-			}
-		}
+    public void UnlockPlanet() {
 
-	}
+        string planetName = planetNameText.text;
 
-	public void OnSettingsOpen() {
+        //subtract cost from total points
 
-		zoomedOutCanvasWorld.SetActive(false);
+        if (Points >= unlockCost[planetInSolarViewIndex]) {
 
-		//activate Panel(animations for later)
-		settingsPanel.SetActive(true);
-		settingsButton.SetActive(false);
-	}
+            Points -= unlockCost[planetInSolarViewIndex];
 
-	public void OnSettingsClose() {
+            for (int i = 0; i < planetsGO.Length; i++) {
+                if (planetsGO[i].name == planetName) {
+                    planetsGO[i].transform.tag = "Planet";
+                    unlockedState[i] = true;
+                    UnlockPlanetButton.SetActive(false);
+                    return;
+                }
+            }
+        }
 
-		zoomedOutCanvasWorld.SetActive(true);
+    }
 
-		settingsPanel.SetActive(false);
-		settingsButton.SetActive(true);
+    public void OnSettingsOpen() {
+        //activate Panel(animations for later)
+        settingsPanel.SetActive(true);
+        settingsButton.SetActive(false);
+    }
 
-	}
+    public void OnSettingsClose() {
+        settingsPanel.SetActive(false);
+        settingsButton.SetActive(true);
+    }
 
+    #endregion
 
+    #region Saving And Loading Data
+    //Save Data
+    void OnApplicationPause(bool pauseStatus) {
 
+        if (pauseStatus) {
+            sysString = System.DateTime.Now.ToBinary().ToString();
+            Save();
+        }
+    }
 
+    void OnDestroy() {
 
-	//Save Data
-	void OnApplicationPause(bool pauseStatus) {
+        sysString = System.DateTime.Now.ToBinary().ToString();
+        Save();
+    }
 
-		if (pauseStatus) {
 
-			sysString = System.DateTime.Now.ToBinary().ToString();
-			Save();
-			//PlayerPrefs.SetInt("sideBarIndex", sideBarIndex);
+    public void Load() {
 
-			//PlayerPrefs.SetFloat("lastX", lastPlanetX);
-			//PlayerPrefs.SetFloat("lastZ", lastPlanetZ);
+        if (File.Exists(Application.persistentDataPath + "/gameData.dat")) {
 
-			//PlayerPrefs.SetString("sysString", System.DateTime.Now.ToBinary().ToString());
-			//PlayerPrefs.SetFloat("Points", Points);
-			//PlayerPrefs.SetFloat("PerClick", PointsPerClick);
-			//PlayerPrefs.SetFloat("PerSecond", PointsPerSecond);
+            BinaryFormatter bf = new BinaryFormatter();
+            FileStream file = File.Open(Application.persistentDataPath + "/gameData.dat", FileMode.Open);
+            GameData data = (GameData)bf.Deserialize(file);
+            file.Close();
+            Points = data.Points;
+            PointsPerClick = data.PointsPerClick;
+            PointsPerSecond = data.PointsPerSecond;
+            lastPlanetX = data.lastPlanetX;
+            lastPlanetZ = data.lastPlanetZ;
+            sysString = data.sysString;
+            planetInSolarViewIndex = data.planetIndex;
+            sideBarIndex = data.sideBarIndex;
+            unlockedState = data.unlockedState;
+        }
+    }
 
+    public void Save() {
 
-		}
-	}
+        BinaryFormatter bf = new BinaryFormatter();
+        FileStream file = File.Create(Application.persistentDataPath + "/gameData.dat");
 
-	void OnDestroy() {
+        GameData data = new GameData();
+        data.Points = Points;
+        data.PointsPerClick = PointsPerClick;
+        data.PointsPerSecond = PointsPerSecond;
+        data.lastPlanetX = lastPlanetX;
+        data.lastPlanetZ = lastPlanetZ;
+        data.sysString = sysString;
+        data.planetIndex = planetInSolarViewIndex;
+        data.sideBarIndex = sideBarIndex;
+        data.unlockedState = unlockedState;
 
-		sysString = System.DateTime.Now.ToBinary().ToString();
-		Save();
+        bf.Serialize(file, data);
+        file.Close();
+    }
 
-		//PlayerPrefs.SetInt("sideBarIndex", sideBarIndex);
+    [Serializable]
+    class GameData {
 
-		//PlayerPrefs.SetFloat("lastX", lastPlanetX);
-		//PlayerPrefs.SetFloat("lastZ", lastPlanetZ);
+        public float Points;
+        public float PointsPerClick;
+        public float PointsPerSecond;
 
-		//PlayerPrefs.SetString("sysString", System.DateTime.Now.ToBinary().ToString());
-		//PlayerPrefs.SetFloat("Points", Points);
-		//PlayerPrefs.SetFloat("PerClick", PointsPerClick);
-		//PlayerPrefs.SetFloat("PerSecond", PointsPerSecond);
+        public float lastPlanetX;
+        public float lastPlanetZ;
 
-	}
+        public string sysString;
 
+        public int planetIndex;
+        public int sideBarIndex;
 
-	public void Load() {
+        public bool[] unlockedState;
+    }
 
-		if (File.Exists(Application.persistentDataPath + "/gameData.dat")) {
+    #endregion
 
-			BinaryFormatter bf = new BinaryFormatter();
-			FileStream file = File.Open(Application.persistentDataPath + "/gameData.dat", FileMode.Open);
-			GameData data = (GameData)bf.Deserialize(file);
-			file.Close();
-
-			Points = data.Points;
-			PointsPerClick = data.PointsPerClick;
-			PointsPerSecond = data.PointsPerSecond;
-			lastPlanetX = data.lastPlanetX;
-			lastPlanetZ = data.lastPlanetZ;
-			sysString = data.sysString;
-			sideBarIndex = data.sideBarIndex;
-		}
-	}
-
-	public void Save() {
-
-		BinaryFormatter bf = new BinaryFormatter();
-		FileStream file = File.Create(Application.persistentDataPath + "/gameData.dat");
-
-		GameData data = new GameData();
-		data.Points = Points;
-		data.PointsPerClick = PointsPerClick;
-		data.PointsPerSecond = PointsPerSecond;
-		data.lastPlanetX = lastPlanetX;
-		data.lastPlanetZ = lastPlanetZ;
-		data.sysString = sysString;
-		data.sideBarIndex = sideBarIndex;
-
-		bf.Serialize(file, data);
-		file.Close();
-	}
-
-	[Serializable]
-	class GameData {
-
-		public float Points;
-		public float PointsPerClick;
-		public float PointsPerSecond;
-
-		public float lastPlanetX;
-		public float lastPlanetZ;
-
-		public string sysString;
-
-		public int sideBarIndex;
-
-	}
 }

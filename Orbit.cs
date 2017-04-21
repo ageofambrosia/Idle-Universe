@@ -4,10 +4,23 @@ using UnityEngine;
 
 public class Orbit : MonoBehaviour {
 
-	public GameObject planetGO;
-	public float orbitAmount;
+    public GameObject planetGO;
+    public float orbitAmount;
 
-	void Update() {
-		transform.RotateAround(planetGO.transform.position, planetGO.transform.up, orbitAmount * Time.deltaTime);
-	}
+    private float offSet;
+    private Vector3 scale;
+    private float distance;
+
+    void Update() {
+
+        distance = planetGO.transform.localScale.x - 0.5f;
+
+        transform.position = (transform.position - planetGO.transform.position).normalized * distance + planetGO.transform.position;
+
+        transform.RotateAround(planetGO.transform.position, planetGO.transform.up, orbitAmount * Time.deltaTime);
+
+        transform.localScale = planetGO.transform.localScale;
+
+
+    }
 }

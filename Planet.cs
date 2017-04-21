@@ -5,43 +5,65 @@ using UnityEngine;
 public class Planet : MonoBehaviour {
 
 
-	public float IdleSpinSpeed = 10;
-	private int clickSpinAmount = 10;
+    public float IdleSpinSpeed = 10;
 
-	private Rigidbody rb;
+    public float planetSize;
 
-	void Awake() {
-		rb = GetComponent<Rigidbody>();
+    private int clickSpinAmount = 10;
+    private Transform planetTransform;
 
-	}
+    private Rigidbody rb;
 
-	public void OnClickRotatePlanet() {
+    void Awake() {
+        rb = GetComponent<Rigidbody>();
+        planetTransform = GetComponent<Transform>();
+    }
 
-		//If clicks are on UI, dont raycast under.
-		if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject(0)) {
-			return;
-		}
+    void Start() {
 
-		rb.AddRelativeTorque(Vector3.up * clickSpinAmount, ForceMode.Impulse);
-		GameManager.Instance.AddPointsEachClick();
-	}
+        string planetName = GetComponent<Transform>().name;
+        planetSize = PlayerPrefs.GetFloat("sizeOf" + planetName, planetSize);
 
-	void RotatePlanetIdle() {
+    }
 
-		rb.AddRelativeTorque(Vector3.up * IdleSpinSpeed);
+    public void OnClickRotatePlanet() {
 
-	}
+        //If clicks are on UI, dont raycast under.
+        if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject(0)) {
+            return;
+        }
 
-	void FixedUpdate() {
+        rb.AddRelativeTorque(Vector3.up * clickSpinAmount, ForceMode.Impulse);
+        GameManager.Instance.AddPointsEachClick();
+    }
 
-		if (GameManager.Instance.PointsPerSecond <= 0) {
-			return;
-		}
-		RotatePlanetIdle();
+    void RotatePlanetIdle() {
 
-	}
+        rb.AddRelativeTorque(Vector3.up * IdleSpinSpeed);
 
-	void Update() {
+    }
 
-	}
+    void FixedUpdate() {
+
+        if (GameManager.Instance.PointsPerSecond <= 0) {
+            return;
+        }
+        RotatePlanetIdle();
+
+    }
+
+    private void Update() {
+
+        planetTransform.localScale = new Vector3(planetSize, planetSize, planetSize);
+
+    }
+
+    public void Save(string nameOf) {
+
+        PlayerPrefs.SetFloat("sizeOf" + nameOf, planetSize);
+
+    }
+
 }
+
+

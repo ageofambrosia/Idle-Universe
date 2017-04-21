@@ -25,6 +25,10 @@ public class PlanetManager : MonoBehaviour {
 
     void HandleInput() {
 
+        if (UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject(0)) {
+            return;
+        }
+
         if (Input.GetMouseButtonDown(0)) {
 
             ray = Camera.main.ScreenPointToRay(Input.mousePosition);
@@ -34,6 +38,8 @@ public class PlanetManager : MonoBehaviour {
                 if (hit.transform.tag == "Planet") {
 
                     if (!myCanvas.activeInHierarchy) {
+
+                        //if planet is availabe(bought)
 
                         //Lerp To planet
                         GameManager.Instance.CameraLerp(mainCam.transform.position,
